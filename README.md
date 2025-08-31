@@ -17,11 +17,12 @@ flowchart LR
 ### Depois (com Docker Compose)
 ```mermaid
 flowchart LR
-  User((Cliente)) --> API[API (app container)]
-  API --> DB[(MySQL container)]
+  User((Cliente)) --> APP[API (container Spring Boot)]
+  APP --> DB[(MySQL container)]
   Adminer[Adminer container] --> DB
+
   subgraph backend [Docker network]
-    API
+    APP
     DB
     Adminer
   end
