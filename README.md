@@ -32,23 +32,23 @@ Inclui o serviço **Adminer** (opcional) para facilitar a demonstração do CRUD
 
 ### Antes do Docker (ambiente local)
 ```mermaid
-flowchart LR
-  DevPC[Dev PC] --> App[Spring Boot (mvnw)]
-  App -->|JDBC| MySQLLocal[(MySQL local)]
-  App --> Swagger[Swagger UI :8080]
+graph LR
+  DevPC["Dev PC"] --> App["Spring Boot (mvnw)"]
+  App -->|JDBC| MySQLLocal["MySQL local"]
+  App --> Swagger["Swagger UI :8080"]
 ```
 
 ### Com Docker Compose (arquitetura alvo)
 ```mermaid
-flowchart LR
-  subgraph docker[Docker Host]
-    subgraph net[rede: backend]
-      App[app (Spring Boot)\nUSER não-root] -->|JDBC| DB[(mysql:8.0\nvolume: mysql-data)]
-      Adminer[adminer:latest :8081] --> DB
+graph LR
+  subgraph docker [Docker Host]
+    subgraph backend [rede: backend]
+      App["app (Spring Boot)<br/>USER não-root"] -->|JDBC| DB[("mysql:8.0<br/>volume: mysql-data")]
+      Adminer["adminer:latest<br/>:8081"] --> DB
     end
   end
-  User[(Navegador)] -->|HTTP :8080| App
-  User -->|HTTP :8081| Adminer
+  User["Navegador"] -->|"HTTP :8080"| App
+  User -->|"HTTP :8081"| Adminer
 ```
 
 ---
