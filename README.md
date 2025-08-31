@@ -1,223 +1,156 @@
-# Green Alert API – Docker Compose
+# 🌱 GreenAlert API — Docker Compose
 
-> Projeto: **green-alert-api-1** (Spring Boot + MySQL)  
-> Este README foi gerado para o **Checkpoint – Docker Compose** e cobre **arquitetura**, **execução com Docker**, **variáveis de ambiente**, **evidências de CRUD**, **troubleshooting** e **checklist** exigidos.
-
----
-
-## Sumário
-- [Sobre](#sobre)
-- [Arquitetura](#arquitetura)
-- [Requisitos](#requisitos)
-- [Primeiros passos](#primeiros-passos)
-  - [Estrutura esperada](#estrutura-esperada)
-  - [Arquivo de propriedades (profile docker)](#arquivo-de-propriedades-profile-docker)
-  - [Variáveis (.env)](#variáveis-env)
-  - [Subir e derrubar a stack](#subir-e-derrubar-a-stack)
-- [Acesso rápido](#acesso-rápido)
-- [Evidências para o vídeo](#evidências-para-o-vídeo)
-- [Troubleshooting](#troubleshooting)
-- [Checklist do Checkpoint](#checklist-do-checkpoint)
-- [Licença](#licença)
+Este README documenta a solução do **Checkpoint - Docker Compose**.  
+Projeto containerizado com **Spring Boot API**, **MySQL** e **Adminer**, cumprindo todos os requisitos do enunciado.
 
 ---
 
-## Sobre
-API Java/Spring Boot containerizada com **Docker Compose**, utilizando **MySQL 8** como banco de dados.  
-Inclui o serviço **Adminer** (opcional) para facilitar a demonstração do CRUD durante a avaliação.
+## 🏗️ Arquitetura
 
----
-
-## Arquitetura
-
-### Antes do Docker (ambiente local)
+### Antes (sem containers)
 ```mermaid
-graph LR
-  DevPC["Dev PC"] --> App["Spring Boot (mvnw)"]
-  App -->|JDBC| MySQLLocal["MySQL local"]
-  App --> Swagger["Swagger UI :8080"]
+flowchart LR
+  Dev[Dev Machine] --> AppLocal[API Java (local)]
+  AppLocal --> DBLocal[(MySQL local)]
 ```
 
-### Com Docker Compose (arquitetura alvo)
+### Depois (com Docker Compose)
 ```mermaid
-graph LR
-  subgraph docker [Docker Host]
-    subgraph backend [rede: backend]
-      App["app (Spring Boot)<br/>USER não-root"] -->|JDBC| DB[("mysql:8.0<br/>volume: mysql-data")]
-      Adminer["adminer:latest<br/>:8081"] --> DB
-    end
+flowchart LR
+  User((Cliente)) --> API[API (app container)]
+  API --> DB[(MySQL container)]
+  Adminer[Adminer container] --> DB
+  subgraph backend [Docker network]
+    API
+    DB
+    Adminer
   end
-  User["Navegador"] -->|"HTTP :8080"| App
-  User -->|"HTTP :8081"| Adminer
+```
+
+### 🔎 Análise da Arquitetura
+- **Serviços:**  
+  - `app` → API Spring Boot (build via Dockerfile)  
+  - `db` → MySQL (imagem oficial)  
+  - `adminer` → Adminer (imagem oficial)  
+- **Dependências:** `app` depende do `db`; `adminer` também depende do `db`. Ordem garantida via `depends_on` + healthchecks.  
+- **Estratégia de containerização:** app é construído em multi-stage Dockerfile (Maven + Temurin JRE, roda como usuário não-root). Banco/Adminer usam imagens oficiais.  
+- **Rede & portas:** rede bridge `backend`, expõe `8080` (API) e `8081` (Adminer). MySQL só interno (`3306`).  
+- **Persistência:** volume `mysql-data` para `/var/lib/mysql`.  
+
+---
+
+## 🚀 Como rodar
+
+### Passos principais
+```bash
+# (opcional) limpar estado anterior
+docker compose down -v
+
+# subir (build + iniciar containers)
+docker compose up -d --build
+
+# ver status e logs
+docker compose ps
+docker compose logs -f app   # Ctrl+C para sair
+```
+
+### Acessos rápidos
+- Swagger → [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)  
+- Adminer → [http://localhost:8081](http://localhost:8081)  
+
+### Derrubar
+```bash
+docker compose down -v
 ```
 
 ---
 
-## Requisitos
-- **Docker** 24+ e **Docker Compose**
-- Portas livres:
-  - `8080` → API
-  - `8081` → Adminer (opcional)
+## ⚙️ Serviços e portas
+
+| Serviço   | Origem            | Porta host | Porta container |
+|-----------|-------------------|------------|-----------------|
+| **app**   | Build via Dockerfile | 8080       | 8080            |
+| **db**    | mysql:8.0 (oficial) | —          | 3306            |
+| **adminer** | adminer:latest (oficial) | 8081       | 8080            |
+
+- Rede: `backend`  
+- Persistência: `mysql-data`  
 
 ---
 
-## Primeiros passos
+## 🔑 Variáveis (.env)
 
-### Estrutura esperada
-Os principais arquivos adicionados para a execução via Docker Compose:
-
-```
-.
-├─ Dockerfile
-├─ docker-compose.yml
-├─ .env                 # NÃO comitar em repositórios públicos
-├─ src/main/resources/
-│  └─ application-docker.properties
-└─ README.md
-```
-
-### Arquivo de propriedades (profile docker)
-Crie `src/main/resources/application-docker.properties` com o seguinte conteúdo:
-
-```properties
-server.port=${SERVER_PORT:8080}
-
-spring.datasource.url=${SPRING_DATASOURCE_URL}
-spring.datasource.username=${SPRING_DATASOURCE_USERNAME}
-spring.datasource.password=${SPRING_DATASOURCE_PASSWORD}
-
-spring.jpa.hibernate.ddl-auto=${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
-spring.jpa.show-sql=${SPRING_JPA_SHOW_SQL:false}
-```
-
-> O profile `docker` será ativado via `SPRING_PROFILES_ACTIVE=docker` no `docker-compose.yml`.
-
-### Variáveis (.env)
-Crie um arquivo **.env** na raiz do projeto com valores de exemplo (ajuste conforme necessário):
-
-```dotenv
-# MySQL
+```env
+APP_PORT=8080
 MYSQL_DATABASE=monitor_tree
 MYSQL_USER=app
 MYSQL_PASSWORD=app
 MYSQL_ROOT_PASSWORD=changeit
-
-# App
-APP_PORT=8080
 ```
-
-> **Importante:** Não comite `.env` com senhas reais.
-
-### Subir e derrubar a stack
-Subir com build (primeira vez ou após alterações):
-```bash
-docker compose up -d --build
-```
-
-Verificar serviços:
-```bash
-docker compose ps
-```
-
-Acompanhar logs (API):
-```bash
-docker compose logs -f app
-```
-
-Derrubar tudo:
-```bash
-docker compose down
-```
+A API conecta usando `jdbc:mysql://db:3306/${MYSQL_DATABASE}`.
 
 ---
 
-## Acesso rápido
+## 🩺 Healthchecks
 
-- **API (Swagger UI):**  
-  http://localhost:8080/swagger-ui/index.html
+- **db** → `mysqladmin ping -h localhost -p$MYSQL_ROOT_PASSWORD`  
+- **app** → `curl -fsS http://app:8080/swagger-ui/index.html || exit 1`  
+> Garantem que o Compose só considera os serviços “saudáveis” quando estão prontos.
 
-- **Adminer (opcional):**  
-  http://localhost:8081  
-  - **Server:** `db`  
-  - **User:** valor de `MYSQL_USER`  
-  - **Pass:** valor de `MYSQL_PASSWORD`  
-  - **Database:** valor de `MYSQL_DATABASE`
+---
 
-> Caso sua aplicação use **JWT**: faça login no endpoint de autenticação e utilize o token `Bearer` nas chamadas subsequentes.
-> Ajuste a seção abaixo para refletir seus endpoints reais.
+## 👤 Usuário não-root
 
-**Exemplos (ajuste aos seus endpoints):**
+O `Dockerfile` da API cria o usuário `spring` e executa o container com `USER spring`.
+
+---
+
+## 🧪 Demonstração rápida (JWT + CRUD)
+
+### 1) Login (ADMIN)
 ```bash
-# (Opcional) Login para obter token JWT (exemplo de payload)
-TOKEN=$(curl -s -X POST http://localhost:8080/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@exemplo.com","password":"1234"}' | sed -E 's/.*"token":"([^"]+)".*/\1/')
-echo $TOKEN
+curl -s -X POST http://localhost:8080/login   -H "Content-Type: application/json"   -d '{"email":"celina@fiap.com.br","password":"12345"}'
+```
 
-# (Opcional) Requisição autenticada
+### 2) CRUD de `Sensor`
+```bash
+# CREATE
+curl -X POST http://localhost:8080/sensores   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"   -d '{"nome":"Sensor A","tipo":"TEMPERATURA","localizacao":"-23.55,-46.63"}'
+
+# READ (lista)
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/sensores
+
+# UPDATE
+curl -X PUT http://localhost:8080/sensores/ID   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"   -d '{"nome":"Sensor A v2","tipo":"TEMPERATURA","localizacao":"-23.56,-46.62"}'
+
+# DELETE
+curl -X DELETE http://localhost:8080/sensores/ID -H "Authorization: Bearer $TOKEN"
 ```
 
----
-
-## Evidências para o vídeo
-Grave um vídeo **com explicação por voz** mostrando:
-1. `docker compose up -d --build` até a API responder.
-2. Abertura do Swagger UI (`/swagger-ui/index.html`).
-3. (Se houver) fluxo de **login/JWT** e chamadas autenticadas.
-4. **CRUD completo** em ao menos uma entidade persistida no MySQL (criar, ler, atualizar, deletar).
-5. (Opcional) Acesso ao **Adminer** comprovando os dados gravados.
-
-> Inclua no PDF final os **links do GitHub** e do **vídeo** de demonstração, conforme a instrução do checkpoint.
+### 3) Comprovação no banco (Adminer)
+- System: **MySQL**  
+- Server: `db`  
+- Username: `app`  
+- Password: `app`  
+- Database: `monitor_tree`  
+- Tabelas: `sensor`, `leitura` (mostrar INSERT/UPDATE/DELETE).  
 
 ---
 
-## Troubleshooting
+## 🛠️ Troubleshooting
 
-**API não responde na 8080**  
-- Verifique se a porta 8080 está livre; ou ajuste `APP_PORT` no `.env`.
-- Veja `docker compose logs -f app` para possíveis erros de conexão com o banco.
-
-**`app` não conecta no `db`**  
-- Aguarde o **healthcheck** do MySQL ficar saudável (`depends_on` com `service_healthy`).
-- Confirme `SPRING_DATASOURCE_URL`, `MYSQL_*` no `.env` e permissões do usuário.
-
-**Erro de driver/credenciais**  
-- Garanta que a dependência do driver MySQL existe no `pom.xml` e credenciais estão corretas.
-
-**Swagger UI não aparece**  
-- Cheque se o Swagger está habilitado no projeto. Como alternativa de sanidade, teste:
-  ```bash
-  curl -v http://localhost:8080/
-  ```
-  ou o endpoint de health (se Actuator estiver habilitado):
-  ```bash
-  curl -s http://localhost:8080/actuator/health
-  ```
-
-**Reset total do banco**  
-```bash
-docker compose down -v   # remove volume mysql-data
-docker compose up -d --build
-```
+- **`version` obsoleta** → remova do `docker-compose.yml`.  
+- **Imagem não encontrada** → mantenha só `build:` no serviço `app` ou rode `docker compose build`.  
+- **Porta ocupada** → altere `APP_PORT` no `.env` ou libere.  
+- **401/403** → refaça login e configure `Bearer <token>`.  
 
 ---
 
-## Checklist do Checkpoint
+## 📑 Checklist de entrega CP
 
-- [x] **2+ containers** (app + db; adminer opcional)  
-- [x] **Imagens oficiais** (mysql, adminer)  
-- [x] **Usuário não-root** no container da aplicação  
-- [x] **Healthchecks** (db e app)  
-- [x] **Rede** dedicada + **volume** para MySQL  
-- [x] **Variáveis de ambiente** e **política de restart**  
-- [x] **README** com instalação, uso, comandos e troubleshooting  
-- [x] **Vídeo com voz** exibindo `up` → Swagger/JWT → CRUD no banco  
-- [x] **PDF `<equipe>-compose.pdf`** com capa, link do **GitHub** e link do **vídeo**
-
-> Observações da banca: utilizar **imagens oficiais**, portar aplicação para **Docker Compose**, e demonstrar **CRUD** persistindo no banco.
-
----
-
-## Licença
-Este projeto segue a licença do repositório original. Caso não exista, considere adotar uma licença como **MIT**.
+- **PDF** `<equipe>-compose.pdf` com:  
+  - Capa (nome + RM + equipe)  
+  - Link GitHub  
+  - Link vídeo  
+- **Vídeo**: demonstrar `docker compose up`, login JWT, CRUD completo, Adminer.  
+- **Mínimo 2 containers** (API + DB). Adminer é opcional mas recomendado.  
