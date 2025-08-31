@@ -10,17 +10,16 @@ Projeto containerizado com **Spring Boot API**, **MySQL** e **Adminer**, cumprin
 ### Antes (sem containers)
 ```mermaid
 flowchart LR
-  Dev[Dev Machine] --> AppLocal[API Java (local)]
-  AppLocal --> DBLocal[(MySQL local)]
+  Dev[Dev Machine] --> AppLocal[API Java - local]
+  AppLocal --> DBLocal[MySQL - local]
 ```
 
 ### Depois (com Docker Compose)
 ```mermaid
 flowchart LR
-  User((Cliente)) --> APP[API (container Spring Boot)]
-  APP --> DB[(MySQL container)]
-  Adminer[Adminer container] --> DB
-
+  User((Cliente)) --> APP[API - container Spring Boot]
+  APP --> DB[MySQL - container]
+  Adminer[Adminer - container] --> DB
   subgraph backend [Docker network]
     APP
     DB
